@@ -1,0 +1,2323 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operation Photon – Rettung der Raumstation AURORA</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Exo+2:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #020817;
+    --bg-panel: #060f24;
+    --bg-card: #0a1830;
+    --bg-card2: #0d1f3c;
+    --accent-cyan: #00e5ff;
+    --accent-blue: #1a6fff;
+    --accent-gold: #ffd700;
+    --accent-green: #00ff88;
+    --accent-red: #ff3d5a;
+    --accent-orange: #ff8c00;
+    --text-main: #c8e6ff;
+    --text-dim: #6a8aaa;
+    --text-bright: #ffffff;
+    --border-glow: rgba(0,229,255,0.25);
+    --glow-cyan: 0 0 20px rgba(0,229,255,0.4), 0 0 60px rgba(0,229,255,0.15);
+    --glow-blue: 0 0 20px rgba(26,111,255,0.5);
+    --glow-green: 0 0 20px rgba(0,255,136,0.4);
+    --glow-red: 0 0 20px rgba(255,61,90,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Exo 2', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* STARS BACKGROUND */
+  #stars-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* MAIN LAYOUT */
+  #app {
+    position: relative;
+    z-index: 10;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  /* HUD TOP BAR */
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: rgba(6,15,36,0.9);
+    border: 1px solid var(--border-glow);
+    border-radius: 4px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+    box-shadow: var(--glow-cyan);
+  }
+
+  #hud-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  #hud-right {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .hud-stat {
+    text-align: center;
+  }
+
+  .hud-stat-label {
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .hud-stat-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+  }
+
+  #timer-val { color: var(--accent-cyan); transition: color 0.3s; }
+  #timer-val.warning { color: var(--accent-orange); }
+  #timer-val.critical { color: var(--accent-red); animation: blink 1s infinite; }
+
+  @keyframes blink { 50% { opacity: 0.4; } }
+
+  #teacher-btn {
+    background: transparent;
+    border: 1px solid rgba(255,215,0,0.3);
+    color: rgba(255,215,0,0.6);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  #teacher-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); box-shadow: 0 0 10px rgba(255,215,0,0.3); }
+
+  /* SCREENS */
+  .screen { display: none; animation: fadeIn 0.6s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+
+  /* INTRO SCREEN */
+  #intro-screen {
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .station-icon {
+    font-size: 5rem;
+    margin-bottom: 20px;
+    display: block;
+    animation: float 4s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(0,229,255,0.8));
+  }
+
+  @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
+
+  #intro-screen h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--text-bright);
+    text-shadow: var(--glow-cyan);
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+
+  #intro-screen .subtitle {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 4px;
+    color: var(--accent-cyan);
+    margin-bottom: 30px;
+    text-transform: uppercase;
+  }
+
+  .story-box {
+    background: rgba(10,24,48,0.8);
+    border: 1px solid var(--border-glow);
+    border-left: 3px solid var(--accent-cyan);
+    border-radius: 4px;
+    padding: 24px 30px;
+    text-align: left;
+    max-width: 700px;
+    margin: 0 auto 30px;
+    line-height: 1.8;
+    font-weight: 300;
+    font-size: 0.95rem;
+  }
+
+  .story-box p { margin-bottom: 12px; }
+  .story-box p:last-child { margin-bottom: 0; }
+  .story-box .highlight { color: var(--accent-cyan); font-weight: 600; }
+  .story-box .warn { color: var(--accent-orange); font-weight: 600; }
+
+  .mission-preview {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    max-width: 700px;
+    margin: 0 auto 30px;
+  }
+
+  .mission-prev-card {
+    background: rgba(10,24,48,0.7);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 4px;
+    padding: 14px 10px;
+    font-size: 0.75rem;
+    transition: all 0.3s;
+  }
+
+  .mission-prev-card .m-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: var(--accent-cyan);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .mission-prev-card .m-name { color: var(--text-dim); font-size: 0.7rem; letter-spacing: 1px; }
+  .mission-prev-card.bonus .m-num { color: var(--accent-gold); }
+
+  /* BUTTONS */
+  .btn-primary {
+    background: linear-gradient(135deg, #0d3a7a, #1a6fff);
+    border: 1px solid var(--accent-cyan);
+    color: #fff;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    padding: 14px 40px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    box-shadow: var(--glow-blue);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #1a4fa0, #3080ff);
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(0,229,255,0.4);
+    color: var(--accent-cyan);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+  }
+
+  .btn-secondary:hover { background: rgba(0,229,255,0.1); box-shadow: var(--glow-cyan); }
+
+  .btn-hint {
+    background: rgba(255,140,0,0.1);
+    border: 1px solid rgba(255,140,0,0.4);
+    color: var(--accent-orange);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 0.72rem;
+    padding: 8px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.3s;
+    letter-spacing: 1px;
+  }
+
+  .btn-hint:hover { background: rgba(255,140,0,0.2); }
+  .btn-hint:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-submit {
+    background: linear-gradient(135deg, #003d1a, #00cc5a);
+    border: 1px solid var(--accent-green);
+    color: #fff;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 12px 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+  }
+
+  .btn-submit:hover { box-shadow: var(--glow-green); transform: translateY(-1px); }
+
+  /* GAME SCREEN */
+  #mission-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    background: rgba(6,15,36,0.9);
+    border: 1px solid var(--border-glow);
+    border-radius: 4px;
+  }
+
+  #mission-number {
+    font-family: 'Orbitron', monospace;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--accent-cyan);
+    text-shadow: var(--glow-cyan);
+    min-width: 60px;
+  }
+
+  #mission-info h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+  }
+
+  #mission-info p {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* PROGRESS */
+  #progress-bar-wrap {
+    margin-bottom: 20px;
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 2px;
+    transition: width 0.6s ease;
+    box-shadow: 0 0 8px rgba(0,229,255,0.6);
+  }
+
+  /* MISSION STEPS */
+  .mission-steps {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,229,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    transition: all 0.4s;
+  }
+
+  .step-dot.active { border-color: var(--accent-cyan); color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+  .step-dot.done { background: var(--accent-green); border-color: var(--accent-green); color: #000; }
+  .step-dot.bonus { border-color: rgba(255,215,0,0.4); color: rgba(255,215,0,0.6); }
+  .step-dot.bonus.active { border-color: var(--accent-gold); color: var(--accent-gold); box-shadow: 0 0 15px rgba(255,215,0,0.4); }
+
+  /* TASK CARD */
+  .task-card {
+    background: rgba(10,24,48,0.9);
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+    padding: 28px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(5px);
+  }
+
+  .task-card.bonus-card {
+    border-color: rgba(255,215,0,0.3);
+    background: rgba(20,15,0,0.5);
+  }
+
+  .task-badge {
+    display: inline-block;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .task-badge.standard { background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.3); color: var(--accent-cyan); }
+  .task-badge.bonus { background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); color: var(--accent-gold); }
+
+  .task-story {
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: rgba(0,0,0,0.2);
+    border-left: 2px solid rgba(0,229,255,0.3);
+    border-radius: 0 3px 3px 0;
+    line-height: 1.6;
+  }
+
+  .task-question {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--text-main);
+    margin-bottom: 20px;
+  }
+
+  .task-question strong { color: var(--accent-cyan); }
+
+  .given-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .value-chip {
+    background: rgba(26,111,255,0.1);
+    border: 1px solid rgba(26,111,255,0.35);
+    border-radius: 3px;
+    padding: 6px 14px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.72rem;
+    color: #7ab8ff;
+  }
+
+  /* HINT BOX */
+  .hint-box {
+    background: rgba(255,140,0,0.05);
+    border: 1px solid rgba(255,140,0,0.25);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    display: none;
+  }
+
+  .hint-box.show { display: block; animation: fadeIn 0.4s; }
+
+  .hint-box .hint-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    color: var(--accent-orange);
+    margin-bottom: 8px;
+  }
+
+  .hint-box code {
+    background: rgba(255,140,0,0.1);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    color: var(--accent-gold);
+    font-size: 0.9rem;
+  }
+
+  /* INPUT AREA */
+  .input-area {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .answer-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .answer-input {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1.5px solid rgba(0,229,255,0.3);
+    border-radius: 4px;
+    padding: 12px 16px;
+    color: var(--text-bright);
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s;
+    letter-spacing: 1px;
+  }
+
+  .answer-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+  .answer-input.correct { border-color: var(--accent-green); box-shadow: var(--glow-green); color: var(--accent-green); }
+  .answer-input.wrong { border-color: var(--accent-red); box-shadow: var(--glow-red); animation: shake 0.4s; }
+
+  @keyframes shake {
+    0%,100%{transform:translateX(0);}
+    20%{transform:translateX(-6px);}
+    40%{transform:translateX(6px);}
+    60%{transform:translateX(-4px);}
+    80%{transform:translateX(4px);}
+  }
+
+  .input-unit {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+
+  /* FEEDBACK MESSAGES */
+  .feedback-msg {
+    font-size: 0.85rem;
+    padding: 10px 16px;
+    border-radius: 3px;
+    margin-top: 10px;
+    display: none;
+    animation: fadeIn 0.3s;
+  }
+
+  .feedback-msg.show { display: block; }
+  .feedback-msg.success { background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); color: var(--accent-green); }
+  .feedback-msg.error { background: rgba(255,61,90,0.08); border: 1px solid rgba(255,61,90,0.3); color: var(--accent-red); }
+  .feedback-msg.info { background: rgba(0,229,255,0.06); border: 1px solid rgba(0,229,255,0.2); color: var(--accent-cyan); }
+
+  .attempt-dots {
+    display: flex; gap: 6px; align-items: center;
+    margin-top: 8px;
+  }
+
+  .attempt-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    transition: all 0.3s;
+  }
+
+  .attempt-dot.used { background: var(--accent-red); box-shadow: 0 0 6px rgba(255,61,90,0.6); }
+  .attempt-dot.used:last-child { animation: pulse-red 1s infinite; }
+
+  @keyframes pulse-red { 0%,100%{box-shadow:0 0 6px rgba(255,61,90,0.6);} 50%{box-shadow:0 0 14px rgba(255,61,90,0.9);} }
+
+  /* MISSION COMPLETE BANNER */
+  .mission-complete {
+    text-align: center;
+    padding: 30px;
+    background: rgba(0,50,25,0.4);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 6px;
+    margin-bottom: 20px;
+    display: none;
+    animation: fadeIn 0.6s;
+  }
+
+  .mission-complete.show { display: block; }
+  .mission-complete h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.4rem;
+    color: var(--accent-green);
+    text-shadow: var(--glow-green);
+    margin-bottom: 12px;
+  }
+
+  .mission-complete p { color: var(--text-main); font-size: 0.9rem; line-height: 1.6; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.85);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    display: none;
+    backdrop-filter: blur(6px);
+  }
+
+  .modal-overlay.show { display: flex; animation: fadeIn 0.3s; }
+
+  .modal-box {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+    padding: 36px;
+    max-width: 480px;
+    width: 90%;
+    text-align: center;
+    box-shadow: var(--glow-cyan);
+  }
+
+  .modal-box h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    color: var(--accent-gold);
+    margin-bottom: 16px;
+    letter-spacing: 2px;
+  }
+
+  .modal-box p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 20px; }
+
+  .modal-input {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1.5px solid rgba(255,215,0,0.3);
+    border-radius: 4px;
+    padding: 12px 16px;
+    color: var(--text-bright);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    outline: none;
+    text-align: center;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+    transition: all 0.3s;
+  }
+
+  .modal-input:focus { border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(255,215,0,0.3); }
+
+  .modal-error { color: var(--accent-red); font-size: 0.8rem; margin-bottom: 12px; display: none; }
+  .modal-error.show { display: block; }
+
+  .modal-buttons { display: flex; gap: 12px; justify-content: center; }
+
+  /* TEACHER MODE */
+  #teacher-screen {
+    background: rgba(20,12,0,0.7);
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 6px;
+    padding: 30px;
+  }
+
+  #teacher-screen h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.2rem;
+    color: var(--accent-gold);
+    margin-bottom: 6px;
+    text-shadow: 0 0 15px rgba(255,215,0,0.4);
+  }
+
+  #teacher-screen .teacher-sub { color: var(--text-dim); font-size: 0.8rem; margin-bottom: 24px; }
+
+  .teacher-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  .teacher-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+
+  .teacher-toggle input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--accent-gold);
+  }
+
+  .solution-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .solution-table th {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    color: var(--accent-gold);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,215,0,0.2);
+    text-transform: uppercase;
+  }
+
+  .solution-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .solution-table tr:hover td { background: rgba(255,215,0,0.03); }
+
+  .solution-table .sol-num { font-family: 'Orbitron', monospace; color: var(--accent-gold); font-weight: 700; }
+  .solution-table .sol-answer { color: var(--accent-green); font-family: 'Orbitron', monospace; }
+  .solution-table .sol-formula { color: var(--text-dim); font-size: 0.75rem; font-style: italic; }
+
+  /* END SCREEN */
+  #end-screen { text-align: center; padding: 40px 20px; }
+
+  .end-icon { font-size: 5rem; margin-bottom: 16px; display: block; }
+
+  #end-screen h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--text-bright);
+    margin-bottom: 10px;
+  }
+
+  .end-score-big {
+    font-family: 'Orbitron', monospace;
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--accent-cyan);
+    text-shadow: var(--glow-cyan);
+    margin: 20px 0;
+    display: block;
+  }
+
+  .end-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    max-width: 500px;
+    margin: 0 auto 30px;
+  }
+
+  .end-stat-box {
+    background: rgba(10,24,48,0.8);
+    border: 1px solid var(--border-glow);
+    border-radius: 4px;
+    padding: 16px;
+  }
+
+  .end-stat-box .e-label { font-size: 0.65rem; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; }
+  .end-stat-box .e-val { font-family: 'Orbitron', monospace; font-size: 1.3rem; color: var(--accent-cyan); }
+
+  .end-message { font-size: 1rem; color: var(--text-main); max-width: 600px; margin: 0 auto 24px; line-height: 1.7; }
+
+  /* LASER ANIMATION */
+  .laser-viz {
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    border-radius: 2px;
+    margin: 16px 0;
+    animation: laser-sweep 2s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--accent-cyan);
+    opacity: 0.6;
+  }
+
+  @keyframes laser-sweep {
+    0% { background-position: -100% 0; width: 0%; margin-left: 0; }
+    50% { width: 100%; margin-left: 0; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    #intro-screen h1 { font-size: 1.3rem; }
+    .mission-preview { grid-template-columns: repeat(2,1fr); }
+    .end-summary { grid-template-columns: 1fr; }
+    #hud-title { display: none; }
+  }
+
+  /* PRISM VISUALIZER */
+  .prism-viz-wrap {
+    background: rgba(5,12,30,0.95);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 6px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .prism-viz-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .prism-viz-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(0,229,255,0.2);
+  }
+
+  #prism-canvas {
+    display: block;
+    width: 100%;
+    max-width: 520px;
+    border-radius: 4px;
+    background: #010812;
+    margin: 0 auto;
+  }
+
+  .prism-controls {
+    display: flex;
+    gap: 20px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .prism-ctrl-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+  }
+
+  .prism-ctrl-label {
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .prism-ctrl-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    color: var(--accent-cyan);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .prism-ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  input[type=range].prism-slider {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 3px;
+    background: rgba(0,229,255,0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range].prism-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px rgba(0,229,255,0.7);
+    cursor: pointer;
+  }
+
+  .prism-info-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    justify-content: center;
+  }
+
+  .prism-info-chip {
+    background: rgba(0,229,255,0.05);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 3px;
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+
+  .prism-info-chip span {
+    font-family: 'Orbitron', monospace;
+    color: var(--accent-cyan);
+    font-size: 0.75rem;
+  }
+
+  .prism-info-chip.total-ref {
+    border-color: rgba(255,61,90,0.4);
+    background: rgba(255,61,90,0.06);
+  }
+
+  .prism-info-chip.total-ref span { color: var(--accent-red); }
+
+  /* Bonus unlock banner */
+  .bonus-unlock {
+    background: rgba(255,215,0,0.06);
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: none;
+    text-align: center;
+  }
+
+  .bonus-unlock.show { display: block; animation: fadeIn 0.6s; }
+  .bonus-unlock h4 { font-family: 'Orbitron', monospace; color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 6px; letter-spacing: 2px; }
+  .bonus-unlock p { font-size: 0.82rem; color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+
+<div id="app">
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-title">◈ AURORA RESCUE PROTOCOL ◈</div>
+    <div id="hud-right">
+      <div class="hud-stat">
+        <div class="hud-stat-label">Zeit</div>
+        <div class="hud-stat-value" id="timer-val">45:00</div>
+      </div>
+      <div class="hud-stat">
+        <div class="hud-stat-label">Punkte</div>
+        <div class="hud-stat-value" id="score-val">0</div>
+      </div>
+      <button id="teacher-btn" onclick="openTeacherModal()">🔑 Lehrermodus</button>
+    </div>
+  </div>
+
+  <!-- INTRO SCREEN -->
+  <div id="intro-screen" class="screen active">
+    <span class="station-icon">🛸</span>
+    <h1>OPERATION PHOTON</h1>
+    <div class="subtitle">Rettung der Raumstation AURORA</div>
+
+    <div class="story-box">
+      <p>
+        Sternenzeit 2157. Die Raumstation <span class="highlight">AURORA</span> treibt bewusstlos durch den Nebelgürtel von Sektor 7. 
+        Ein Meteoritenschauer hat das optische Kommunikationsnetz getroffen – alle <span class="highlight">Lichtleiter</span> sind zerstört.
+      </p>
+      <p>
+        Du bist die letzte Rettungsspezialistin / der letzte Rettungsspezialist der <span class="highlight">Galaktischen Physik-Brigade</span>. 
+        Um die Station zu retten, musst du die beschädigten Systeme kalibrieren. 
+        Das geht nur, wenn du die Gesetze der <span class="highlight">Lichtbrechung und Totalreflexion</span> exakt beherrschst.
+      </p>
+      <p>
+        <span class="warn">⚠ Du hast genau 45 Minuten.</span> Berechne die Aufgaben auf deinem Arbeitsblatt und gib die Ergebnisse ein, um die Systeme freizuschalten.
+      </p>
+    </div>
+
+    <div class="mission-preview">
+      <div class="mission-prev-card">
+        <span class="m-num">01</span>
+        <div class="m-name">Der Eintritt<br>Brechungsgesetz</div>
+      </div>
+      <div class="mission-prev-card">
+        <span class="m-num">02</span>
+        <div class="m-name">Die Analyse<br>Materialbestimmung</div>
+      </div>
+      <div class="mission-prev-card">
+        <span class="m-num">03</span>
+        <div class="m-name">Der Grenzbereich<br>Totalreflexion</div>
+      </div>
+      <div class="mission-prev-card bonus">
+        <span class="m-num">★</span>
+        <div class="m-name">Die Reparatur<br>Lichtleiter-Bonus</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="startGame()">▶ MISSION STARTEN</button>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="screen">
+    <div id="mission-header">
+      <div id="mission-number">01</div>
+      <div id="mission-info">
+        <h2 id="mission-title">Der Eintritt</h2>
+        <p id="mission-subtitle">Kalibriere die Eintrittssensoren der Station</p>
+      </div>
+    </div>
+
+    <div id="progress-bar-wrap">
+      <div class="progress-label">
+        <span>Missionsfortschritt</span>
+        <span id="progress-text">0 / 6 Aufgaben</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="mission-steps" id="step-dots"></div>
+
+    <div id="task-area"></div>
+
+    <div class="bonus-unlock" id="bonus-unlock">
+      <h4>★ BONUS-MISSION FREIGESCHALTET</h4>
+      <p>Alle Pflichtaufgaben abgeschlossen! Die geheime Lichtleiter-Mission ist jetzt verfügbar.</p>
+    </div>
+
+    <div class="mission-complete" id="mission-complete-banner">
+      <h3 id="mc-title">✓ MISSION ABGESCHLOSSEN</h3>
+      <p id="mc-text"></p>
+      <br>
+      <button class="btn-primary" id="mc-next-btn" onclick="nextMission()">NÄCHSTE MISSION ▶</button>
+    </div>
+  </div>
+
+  <!-- END SCREEN -->
+  <div id="end-screen" class="screen">
+    <span class="end-icon" id="end-icon">🛸</span>
+    <h2 id="end-title">MISSION BEENDET</h2>
+    <p id="end-subtitle" style="color:var(--text-dim);font-size:0.85rem;letter-spacing:2px;margin-bottom:10px;"></p>
+    <span class="end-score-big" id="final-score">0</span>
+    <div style="font-size:0.7rem;letter-spacing:3px;color:var(--text-dim);margin-bottom:24px;">PUNKTE</div>
+    <div class="end-summary">
+      <div class="end-stat-box">
+        <div class="e-label">Aufgaben gelöst</div>
+        <div class="e-val" id="end-solved">0</div>
+      </div>
+      <div class="end-stat-box">
+        <div class="e-label">Hinweise genutzt</div>
+        <div class="e-val" id="end-hints">0</div>
+      </div>
+      <div class="end-stat-box">
+        <div class="e-label">Fehlversuche</div>
+        <div class="e-val" id="end-errors">0</div>
+      </div>
+      <div class="end-stat-box">
+        <div class="e-label">Verbleibende Zeit</div>
+        <div class="e-val" id="end-time">--:--</div>
+      </div>
+    </div>
+    <p class="end-message" id="end-message"></p>
+    <button class="btn-primary" onclick="restartGame()">↺ NEU STARTEN</button>
+  </div>
+
+  <!-- TEACHER SCREEN -->
+  <div id="teacher-screen" class="screen">
+    <h2>🔑 LEHRERMODUS</h2>
+    <p class="teacher-sub">Alle Lösungen, Formeln und Hinweise auf einen Blick</p>
+
+    <div class="teacher-toggle">
+      <label>
+        <input type="checkbox" id="timer-disable-cb" onchange="toggleTimer(this.checked)">
+        Timer deaktivieren
+      </label>
+    </div>
+
+    <div class="laser-viz"></div>
+
+    <table class="solution-table">
+      <thead>
+        <tr>
+          <th>Aufgabe</th>
+          <th>Frage</th>
+          <th>Formel / Weg</th>
+          <th>Lösung</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="sol-num">1.1</td>
+          <td>Brechungswinkel in Spezialglas</td>
+          <td class="sol-formula">n₁·sin(α₁) = n₂·sin(α₂)<br>sin(α₂) = (1,00 · sin(40°)) / 1,55</td>
+          <td class="sol-answer">α₂ ≈ 24,8°</td>
+        </tr>
+        <tr>
+          <td class="sol-num">1.2</td>
+          <td>Einfallswinkel im Glas (rückwärts)</td>
+          <td class="sol-formula">n₁·sin(α₁) = n₂·sin(α₂)<br>sin(α₁) = (1,00 · sin(55°)) / 1,55</td>
+          <td class="sol-answer">α₁ ≈ 32,1°</td>
+        </tr>
+        <tr>
+          <td class="sol-num">2.1</td>
+          <td>Brechungsindex Kühlmittel</td>
+          <td class="sol-formula">n = sin(50°) / sin(35°)<br>Vergleich: Wasser n ≈ 1,33</td>
+          <td class="sol-answer">n ≈ 1,34 → Wasser</td>
+        </tr>
+        <tr>
+          <td class="sol-num">3.1</td>
+          <td>Grenzwinkel Glasfaser in Wasser</td>
+          <td class="sol-formula">sin(αg) = n₂/n₁ = 1,33/1,52</td>
+          <td class="sol-answer">αg ≈ 61,0°</td>
+        </tr>
+        <tr>
+          <td class="sol-num">3.2a</td>
+          <td>Grenzwinkel Saphir in Luft</td>
+          <td class="sol-formula">sin(αg) = 1,00/1,77</td>
+          <td class="sol-answer">αg ≈ 34,4°</td>
+        </tr>
+        <tr>
+          <td class="sol-num">3.2b</td>
+          <td>Totalreflexion bei 30°?</td>
+          <td class="sol-formula">30° &lt; 34,4° → keine Totalreflexion</td>
+          <td class="sol-answer">Nein</td>
+        </tr>
+        <tr>
+          <td class="sol-num">1.P1</td>
+          <td>Prisma: Eintrittswinkel β₁</td>
+          <td class="sol-formula">sin(β₁) = sin(35°)/1,50 = 0,383</td>
+          <td class="sol-answer">β₁ ≈ 22,5°</td>
+        </tr>
+        <tr>
+          <td class="sol-num">1.P1+</td>
+          <td>Prisma: Austrittswinkel α₂ (Arbeitsblatt)</td>
+          <td class="sol-formula">β₂ = 60°−22,5° = 37,5°; sin(α₂) = 1,50·sin(37,5°)</td>
+          <td class="sol-answer">α₂ ≈ 66,2°</td>
+        </tr>
+        <tr>
+          <td class="sol-num">3.P1</td>
+          <td>Prisma: Grenzwinkel Totalreflexion</td>
+          <td class="sol-formula">sin(αg) = 1,00/1,50 = 0,667; 60° > 41,8° → TR!</td>
+          <td class="sol-answer">αg ≈ 41,8° → TR tritt auf</td>
+        </tr>
+          <td>Grenzwinkel Lichtleiterkern</td>
+          <td class="sol-formula">sin(αg) = 1,45/1,60</td>
+          <td class="sol-answer">αg ≈ 64,9°</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <br>
+    <button class="btn-secondary" onclick="exitTeacherMode()">← ZURÜCK ZUM SPIEL</button>
+  </div>
+</div>
+
+<!-- PRISM VISUALIZER MODAL -->
+<div class="modal-overlay" id="prism-modal" style="z-index:400;">
+  <div class="modal-box" style="max-width:580px;width:95%;padding:24px;">
+    <h3 style="margin-bottom:14px;">🔺 PRISMA-VISUALISIERUNG</h3>
+    <div class="prism-viz-wrap" style="margin-bottom:0;">
+      <canvas id="prism-canvas" width="520" height="300"></canvas>
+      <div class="prism-controls">
+        <div class="prism-ctrl-group">
+          <div class="prism-ctrl-label">Einfallswinkel α₁</div>
+          <div class="prism-ctrl-row">
+            <input type="range" class="prism-slider" id="pslider-alpha" min="5" max="80" value="35" oninput="updatePrism()">
+            <div class="prism-ctrl-val" id="pval-alpha">35°</div>
+          </div>
+        </div>
+        <div class="prism-ctrl-group">
+          <div class="prism-ctrl-label">Prismenwinkel γ</div>
+          <div class="prism-ctrl-row">
+            <input type="range" class="prism-slider" id="pslider-gamma" min="20" max="70" value="60" oninput="updatePrism()">
+            <div class="prism-ctrl-val" id="pval-gamma">60°</div>
+          </div>
+        </div>
+        <div class="prism-ctrl-group">
+          <div class="prism-ctrl-label">Brechungsindex n</div>
+          <div class="prism-ctrl-row">
+            <input type="range" class="prism-slider" id="pslider-n" min="100" max="200" value="150" oninput="updatePrism()">
+            <div class="prism-ctrl-val" id="pval-n">1.50</div>
+          </div>
+        </div>
+      </div>
+      <div class="prism-info-row" id="prism-info-row"></div>
+    </div>
+    <br>
+    <button class="btn-secondary" onclick="closePrismModal()">← SCHLIESSEN</button>
+  </div>
+</div>
+
+<!-- TEACHER PASSWORD MODAL -->
+<div class="modal-overlay" id="teacher-modal">
+  <div class="modal-box">
+    <h3>🔑 LEHRERZUGANG</h3>
+    <p>Bitte Passwort eingeben:</p>
+    <input type="password" class="modal-input" id="teacher-pw-input" placeholder="••••••••••" onkeydown="if(event.key==='Enter')checkTeacherPw()">
+    <div class="modal-error" id="pw-error">Falsches Passwort. Bitte erneut versuchen.</div>
+    <div class="modal-buttons">
+      <button class="btn-submit" onclick="checkTeacherPw()">BESTÄTIGEN</button>
+      <button class="btn-secondary" onclick="closeTeacherModal()">ABBRECHEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIME UP MODAL -->
+<div class="modal-overlay" id="timeup-modal">
+  <div class="modal-box">
+    <h3 style="color:var(--accent-red)">⚠ ZEIT ABGELAUFEN</h3>
+    <p>Die Rettungskapsel muss jetzt abdocken. Dein aktueller Fortschritt wird gespeichert.</p>
+    <div class="modal-buttons">
+      <button class="btn-primary" onclick="endGame(true)">ERGEBNIS ANZEIGEN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================
+// STARS BACKGROUND
+// =============================================
+(function() {
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = [];
+    for (let i = 0; i < 220; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 1.5 + 0.3,
+        opacity: Math.random() * 0.7 + 0.1,
+        twinkle: Math.random() * 0.02 + 0.005,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+    stars.forEach(s => {
+      s.phase += s.twinkle;
+      const op = s.opacity * (0.6 + 0.4 * Math.sin(s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,230,255,${op})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); initStars(); });
+  resize();
+  initStars();
+  draw();
+})();
+
+// =============================================
+// GAME DATA
+// =============================================
+const TASKS = [
+  // Mission 1
+  {
+    id: 'T1_1',
+    mission: 1,
+    badge: 'standard',
+    badgeText: 'Mission 01 – Brechungsgesetz',
+    story: '🔭 Rettungsroboter LUCA-7 sendet einen Diagnosestrahl aus. Er muss durch die Schutzscheibe des äußeren Sensormoduls eindringen.',
+    question: 'Ein Laserstrahl trifft mit einem Einfallswinkel von <strong>40°</strong> von Luft (n₁ = 1,00) auf eine Schutzscheibe aus Spezialglas (n₂ = 1,55). Berechne den <strong>Brechungswinkel</strong> im Glas.',
+    values: ['α₁ = 40°', 'n₁ = 1,00', 'n₂ = 1,55'],
+    answer: 24.8,
+    tolerance: 1.0,
+    unit: '°',
+    points: 15,
+    hints: [
+      'Formel: <code>n₁ · sin(α₁) = n₂ · sin(α₂)</code> — Stelle nach sin(α₂) um!',
+      'Einsetzen: <code>sin(α₂) = (1,00 · sin(40°)) / 1,55 = 0,642 / 1,55 ≈ 0,414</code> → α₂ = arcsin(0,414)'
+    ],
+    successMsg: '✓ Zielkoordinaten berechnet! LUCA-7 kalibriert den Eintrittspunkt korrekt.',
+    errorMsgs: [
+      '✗ Systemfehler: Der Strahl verfehlt das Ziel. Überprüfe deine Formel!',
+      '✗ Zweiter Fehlversuch. Tipp: Stelle die Brechungsformel nach sin(α₂) um.',
+      '✗ Letzter Versuch! Schau dir den Hinweis an – du schaffst das!'
+    ]
+  },
+  {
+    id: 'T1_2',
+    mission: 1,
+    badge: 'standard',
+    badgeText: 'Mission 01 – Brechungsgesetz',
+    story: '🔭 Derselbe Strahl muss die Scheibe auf der anderen Seite verlassen. Der Brechungswinkel außen in Luft ist bekannt.',
+    question: 'Der Lichtstrahl verlässt die Schutzscheibe wieder in Luft. Der <strong>Brechungswinkel in der Luft beträgt 55°</strong>. Berechne den <strong>Einfallswinkel</strong> im Glas (n = 1,55).',
+    values: ['α₂(Luft) = 55°', 'n₁(Glas) = 1,55', 'n₂(Luft) = 1,00'],
+    answer: 32.1,
+    tolerance: 1.0,
+    unit: '°',
+    points: 15,
+    hints: [
+      'Formel: <code>n₁ · sin(α₁) = n₂ · sin(α₂)</code> — Diesmal ist α₂ bekannt, gesucht ist α₁!',
+      'Einsetzen: <code>sin(α₁) = (1,00 · sin(55°)) / 1,55 = 0,819 / 1,55 ≈ 0,528</code> → α₁ = arcsin(0,528)'
+    ],
+    successMsg: '✓ Austrittswinkel verifiziert! Modul 1 – Schutzscheibe kalibriert.',
+    errorMsgs: [
+      '✗ Systemfehler: Falscher Winkel. Achtung: Jetzt ist der Winkel in Luft gegeben!',
+      '✗ Zweiter Fehlversuch. Diesmal ist α₁ (im Glas) gesucht – nicht α₂!',
+      '✗ Nutze den Hinweis!'
+    ]
+  },
+  {
+    id: 'T1_P1',
+    mission: 1,
+    badge: 'standard',
+    badgeText: 'Mission 01 – Prisma: Eintritt & Austritt',
+    prismViz: true,
+    story: '🔺 Das Navigationssystem der AURORA nutzt ein Glasprisma zur Strahlablenkung. Du musst beide Brechungswinkel berechnen, um den Kurs zu korrigieren.',
+    question: 'Ein Lichtstrahl tritt mit <strong>α₁ = 35°</strong> in ein Glasprisma (n = 1,50, Prismenwinkel γ = 60°) ein.<br><br>' +
+      '<b>a)</b> Berechne den Brechungswinkel β₁ beim <strong>Eintritt</strong> in das Prisma (Luft → Glas).<br>' +
+      '<b>Tipp:</b> Am Austritt gilt: β₂ = γ − β₁, dann mit Snellius den Austrittswinkel α₂ bestimmen.<br><br>' +
+      'Gib zunächst β₁ (Brechungswinkel im Prisma beim Eintritt) ein:',
+    values: ['α₁ = 35°', 'n(Glas) = 1,50', 'γ = 60°', 'n(Luft) = 1,00'],
+    answer: 22.5,
+    tolerance: 1.0,
+    unit: '°',
+    points: 15,
+    hints: [
+      'Eintritt – Snellius: <code>n₁·sin(α₁) = n₂·sin(β₁)</code> → <code>sin(β₁) = sin(35°)/1,50</code>',
+      'Rechnung: <code>sin(β₁) = 0,574/1,50 = 0,383</code> → β₁ = arcsin(0,383) ≈ 22,5°'
+    ],
+    successMsg: '✓ Eintrittswinkel korrekt! β₁ ≈ 22,5°. Nutze die Visualisierung und berechne jetzt β₂ und α₂ auf dem Arbeitsblatt.',
+    errorMsgs: [
+      '✗ Falscher Eintrittswinkel. Wende Snellius auf Eintrittsseite an: sin(β₁) = sin(α₁)/n',
+      '✗ Zweiter Fehlversuch. n₁ = 1,00 (Luft), n₂ = 1,50 (Glas) – berechne β₁!',
+      '✗ Schau auf Hinweis 1!'
+    ]
+  },
+  // Mission 2
+  {
+    id: 'T2_1',
+    mission: 2,
+    badge: 'standard',
+    badgeText: 'Mission 02 – Materialanalyse',
+    story: '🧪 Das Kühlsystem der Station läuft mit einer unbekannten Flüssigkeit. Du musst den Brechungsindex messen, um das Material zu identifizieren.',
+    question: 'Ein Lichtstrahl tritt von Luft aus in ein unbekanntes Kühlmittel ein. Der <strong>Einfallswinkel</strong> beträgt 50°, der <strong>Brechungswinkel</strong> im Kühlmittel beträgt 35°. Berechne den <strong>Brechungsindex</strong> des Kühlmittels. Hinweis: Ethanol: n ≈ 1,36 | Wasser: n ≈ 1,33 | Glyzerin: n ≈ 1,47',
+    values: ['α₁ = 50°', 'α₂ = 35°', 'n₁(Luft) = 1,00'],
+    answer: 1.34,
+    tolerance: 0.05,
+    unit: '',
+    unitDisplay: '(kein °)',
+    points: 20,
+    hints: [
+      'Formel umstellen: <code>n₂ = n₁ · sin(α₁) / sin(α₂)</code>',
+      'Einsetzen: <code>n₂ = 1,00 · sin(50°) / sin(35°) = 0,766 / 0,574 ≈ 1,34</code> → Vergleich mit Tabelle!'
+    ],
+    successMsg: '✓ Brechungsindex bestimmt: n ≈ 1,34 → Das Kühlmittel ist Wasser! System identifiziert.',
+    errorMsgs: [
+      '✗ Falscher Wert. Stelle die Brechungsformel nach n₂ um!',
+      '✗ Zweiter Fehlversuch. Beachte: Kein Winkel gesucht, sondern ein Brechungsindex (Dezimalzahl)!',
+      '✗ Schau dir den Hinweis an!'
+    ]
+  },
+  // Mission 3
+  {
+    id: 'T3_1',
+    mission: 3,
+    badge: 'standard',
+    badgeText: 'Mission 03 – Totalreflexion',
+    story: '🌊 Die Lichtleiter des Datennetzes bestehen aus Glasfasern, umgeben von Wasser (Leck im Kühlsystem). Du musst den Grenzwinkel bestimmen, ab dem Totalreflexion auftritt.',
+    question: 'Die Glasfasern der Station haben den Brechungsindex <strong>n = 1,52</strong> und sind von Wasser (<strong>n = 1,33</strong>) umgeben. Berechne den <strong>Grenzwinkel</strong> der Totalreflexion.',
+    values: ['n₁(Glas) = 1,52', 'n₂(Wasser) = 1,33'],
+    answer: 61.0,
+    tolerance: 1.0,
+    unit: '°',
+    points: 15,
+    hints: [
+      'Formel für den Grenzwinkel: <code>sin(αg) = n₂ / n₁</code>',
+      'Einsetzen: <code>sin(αg) = 1,33 / 1,52 ≈ 0,875</code> → αg = arcsin(0,875)'
+    ],
+    successMsg: '✓ Grenzwinkel kalibriert! Die Lichtleiter können den Strahl halten – wenn der Winkel stimmt.',
+    errorMsgs: [
+      '✗ Falscher Grenzwinkel. Beachte: n₁ ist das dichtere Medium (Glas), n₂ das dünnere (Wasser)!',
+      '✗ Zweiter Fehlversuch. Formel: sin(αg) = n₂ / n₁',
+      '✗ Nutze den Hinweis!'
+    ]
+  },
+  {
+    id: 'T3_2a',
+    mission: 3,
+    badge: 'standard',
+    badgeText: 'Mission 03 – Totalreflexion',
+    story: '💎 Ein Saphir-Kristall dient als Umlenkspiegel im optischen System. Berechne seinen Grenzwinkel.',
+    question: 'Ein Lichtstrahl läuft in einem <strong>Saphir-Kristall (n = 1,77)</strong> und trifft auf die Grenzfläche zu <strong>Luft (n = 1,00)</strong>. Bei welchem <strong>Grenzwinkel</strong> tritt Totalreflexion auf?',
+    values: ['n₁(Saphir) = 1,77', 'n₂(Luft) = 1,00'],
+    answer: 34.4,
+    tolerance: 1.0,
+    unit: '°',
+    points: 10,
+    hints: [
+      'Formel: <code>sin(αg) = n₂ / n₁ = 1,00 / 1,77</code>',
+      'Rechnung: <code>sin(αg) = 0,565</code> → αg = arcsin(0,565) ≈ 34,4°'
+    ],
+    successMsg: '✓ Saphir-Umlenkspiegel kalibriert! Grenzwinkel bestätigt.',
+    errorMsgs: [
+      '✗ Falscher Wert. Achte darauf, welches Medium das dichtere ist!',
+      '✗ Zweiter Fehlversuch. n₁ = 1,77 (Saphir), n₂ = 1,00 (Luft)',
+      '✗ Schau dir den Hinweis an!'
+    ]
+  },
+  {
+    id: 'T3_2b',
+    mission: 3,
+    badge: 'standard',
+    badgeText: 'Mission 03 – Totalreflexion',
+    story: '💎 Der Strahl trifft unter 30° auf die Grenzfläche. Wird Totalreflexion auftreten?',
+    question: 'Der Grenzwinkel des Saphirs beträgt ≈ 34,4°. Tritt bei einem <strong>Einfallswinkel von 30°</strong> Totalreflexion auf? Gib an: <strong>0 = Nein</strong> oder <strong>1 = Ja</strong>.',
+    values: ['αg(Saphir) ≈ 34,4°', 'α = 30°'],
+    answer: 0,
+    tolerance: 0.1,
+    unit: '',
+    unitDisplay: '(0=Nein / 1=Ja)',
+    points: 5,
+    hints: [
+      'Totalreflexion tritt nur auf, wenn der Einfallswinkel <strong>größer</strong> als der Grenzwinkel ist!',
+      'Vergleich: Einfallswinkel 30° < Grenzwinkel 34,4° → Kein Totalreflexion!'
+    ],
+    successMsg: '✓ Korrekt! Bei 30° ist noch keine Totalreflexion – der Strahl tritt aus. Der Winkel muss > 34,4° sein.',
+    errorMsgs: [
+      '✗ Nicht korrekt. Merke: Totalreflexion nur wenn Einfallswinkel > Grenzwinkel!',
+      '✗ Vergleiche: 30° und 34,4° – was ist größer?',
+      '✗ Schaue auf den Hinweis!'
+    ]
+  },
+  {
+    id: 'T3_P1',
+    mission: 3,
+    badge: 'standard',
+    badgeText: 'Mission 03 – Totalreflexion im Prisma',
+    prismViz: true,
+    story: '🔺 Das Prisma im Navigationssystem soll als Totalreflexionsspiegel wirken. Du musst prüfen, ob Totalreflexion im Prisma stattfindet.',
+    question: 'Ein gleichseitiges Glasprisma (γ = 60°, n = 1,50) wird als Umlenkspiegel verwendet. Ein Lichtstrahl tritt senkrecht in eine Fläche ein (Einfallswinkel = 0°).<br><br>' +
+      'Der Strahl trifft im Inneren auf die zweite Fläche. Der Innenwinkel beträgt dort <strong>β₂ = 60°</strong>.<br><br>' +
+      'Berechne den <strong>Grenzwinkel</strong> für Totalreflexion (Glas → Luft) und entscheide: Tritt Totalreflexion auf?<br><br>' +
+      'Gib den Grenzwinkel αg (in °) ein:',
+    values: ['n(Glas) = 1,50', 'n(Luft) = 1,00', 'β₂ = 60°'],
+    answer: 41.8,
+    tolerance: 1.0,
+    unit: '°',
+    points: 15,
+    hints: [
+      'Grenzwinkel-Formel: <code>sin(αg) = n₂/n₁ = 1,00/1,50</code>',
+      'Rechnung: <code>sin(αg) = 0,667</code> → αg = arcsin(0,667) ≈ 41,8° — Da β₂ = 60° > 41,8°: Totalreflexion tritt auf! ✓'
+    ],
+    successMsg: '✓ Exzellent! αg ≈ 41,8° — Da der Innenwinkel 60° > 41,8° ist, tritt Totalreflexion auf. Das Prisma funktioniert als Spiegel!',
+    errorMsgs: [
+      '✗ Falscher Grenzwinkel. Formel: sin(αg) = n(Luft) / n(Glas) = 1,00 / 1,50',
+      '✗ Zweiter Fehlversuch. n₁ = 1,50 (Glas, dichter), n₂ = 1,00 (Luft)',
+      '✗ Nutze den Hinweis!'
+    ]
+  },
+  // BONUS
+  {
+    id: 'T4_1',
+    mission: 4,
+    badge: 'bonus',
+    badgeText: '★ BONUS-MISSION 04 – Lichtleiter',
+    story: '🔧 Das Ersatz-Glasfaserkabel ist eingebaut! Kern und Mantel haben unterschiedliche Brechungsindizes – nur wenn die Totalreflexion funktioniert, kann das Signal transportiert werden.',
+    question: '<strong>Bonusaufgabe:</strong> Ein Glasfaserkabel hat einen Kern mit <strong>n = 1,60</strong> und einen Mantel mit <strong>n = 1,45</strong>. Berechne den <strong>Grenzwinkel</strong> der Totalreflexion im Kern.',
+    values: ['n₁(Kern) = 1,60', 'n₂(Mantel) = 1,45'],
+    answer: 64.9,
+    tolerance: 1.0,
+    unit: '°',
+    points: 20,
+    hints: [
+      'Formel: <code>sin(αg) = n₂ / n₁ = 1,45 / 1,60</code>',
+      'Rechnung: <code>sin(αg) = 0,906</code> → αg = arcsin(0,906) ≈ 64,9°'
+    ],
+    successMsg: '✓ AUSGEZEICHNET! Lichtleiter vollständig repariert! Die AURORA ist gerettet!',
+    errorMsgs: [
+      '✗ Nicht ganz. Achte auf die Werte: Kern = 1,60 ist das dichtere Medium.',
+      '✗ Zweiter Fehlversuch. sin(αg) = 1,45 / 1,60',
+      '✗ Hinweis nutzen – du bist fast am Ziel!'
+    ]
+  }
+];
+
+// =============================================
+// GAME STATE
+// =============================================
+let state = {
+  screen: 'intro',
+  currentTaskIndex: 0,
+  score: 0,
+  hintsUsed: 0,
+  errorsTotal: 0,
+  solvedCount: 0,
+  taskStates: {},
+  timerSeconds: 45 * 60,
+  timerRunning: false,
+  timerDisabled: false,
+  timerInterval: null,
+  bonusUnlocked: false,
+  gameEnded: false,
+  timeRemaining: ''
+};
+
+// =============================================
+// TIMER
+// =============================================
+function startTimer() {
+  state.timerRunning = true;
+  state.timerInterval = setInterval(() => {
+    if (state.timerDisabled || !state.timerRunning) return;
+    state.timerSeconds--;
+    updateTimerDisplay();
+    if (state.timerSeconds <= 0) {
+      clearInterval(state.timerInterval);
+      state.timerRunning = false;
+      showTimeUpModal();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(state.timerSeconds / 60);
+  const s = state.timerSeconds % 60;
+  const display = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const el = document.getElementById('timer-val');
+  el.textContent = display;
+  if (state.timerSeconds <= 300) { el.className = 'hud-stat-value critical'; }
+  else if (state.timerSeconds <= 600) { el.className = 'hud-stat-value warning'; }
+  else { el.className = 'hud-stat-value'; }
+  state.timeRemaining = display;
+}
+
+function toggleTimer(disabled) {
+  state.timerDisabled = disabled;
+}
+
+// =============================================
+// SCREENS
+// =============================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id + '-screen').classList.add('active');
+  state.screen = id;
+}
+
+function startGame() {
+  showScreen('game');
+  state.timerRunning = false;
+  state.currentTaskIndex = 0;
+  startTimer();
+  renderTask();
+  updateStepDots();
+}
+
+function restartGame() {
+  state = {
+    screen: 'intro',
+    currentTaskIndex: 0,
+    score: 0,
+    hintsUsed: 0,
+    errorsTotal: 0,
+    solvedCount: 0,
+    taskStates: {},
+    timerSeconds: 45 * 60,
+    timerRunning: false,
+    timerDisabled: false,
+    timerInterval: null,
+    bonusUnlocked: false,
+    gameEnded: false,
+    timeRemaining: ''
+  };
+  clearInterval(state.timerInterval);
+  document.getElementById('score-val').textContent = '0';
+  updateTimerDisplay();
+  document.getElementById('timer-val').className = 'hud-stat-value';
+  showScreen('intro');
+}
+
+// =============================================
+// TASK RENDERING
+// =============================================
+function renderTask() {
+  const idx = state.currentTaskIndex;
+  if (idx >= TASKS.length) { endGame(false); return; }
+
+  const task = TASKS[idx];
+  const ts = state.taskStates[task.id] || { attempts: 0, hintsShown: 0, solved: false };
+  state.taskStates[task.id] = ts;
+
+  // Mission header
+  const mNum = String(task.mission).padStart(2,'0');
+  document.getElementById('mission-number').textContent = task.mission === 4 ? '★' : mNum;
+
+  const missionNames = { 1: 'Der Eintritt', 2: 'Die Analyse', 3: 'Der Grenzbereich', 4: 'Die Reparatur' };
+  const missionSubs = {
+    1: 'Brechungsgesetz kalibrieren',
+    2: 'Unbekannte Materialien identifizieren',
+    3: 'Grenzwinkel der Totalreflexion bestimmen',
+    4: 'Lichtleiter reparieren – Bonusmission'
+  };
+
+  document.getElementById('mission-title').textContent = missionNames[task.mission];
+  document.getElementById('mission-subtitle').textContent = missionSubs[task.mission];
+
+  // Progress
+  const done = Object.values(state.taskStates).filter(t => t.solved).length;
+  const total = TASKS.filter(t => t.mission !== 4).length;
+  document.getElementById('progress-text').textContent = `${done} / ${total} Aufgaben`;
+  document.getElementById('progress-fill').style.width = `${(done / total) * 100}%`;
+
+  // Hide complete banner
+  document.getElementById('mission-complete-banner').classList.remove('show');
+
+  // Build task HTML
+  const valChips = task.values.map(v => `<div class="value-chip">${v}</div>`).join('');
+  const unitLabel = task.unit === '' ? (task.unitDisplay || '') : `°`;
+  const unitSpan = task.unit !== '' ? `<span class="input-unit">°</span>` : '';
+
+  const html = `
+    <div class="task-card ${task.badge === 'bonus' ? 'bonus-card' : ''}">
+      <div class="task-badge ${task.badge}">${task.badgeText}</div>
+      <div class="task-story">${task.story}</div>
+      <div class="task-question">${task.question}</div>
+      <div class="given-values">${valChips}</div>
+
+      ${task.prismViz ? `
+      <div style="margin-bottom:14px;">
+        <button class="btn-secondary" style="font-size:0.65rem;padding:8px 16px;" onclick="openPrismModal()">
+          🔺 PRISMA-VISUALISIERUNG ÖFFNEN
+        </button>
+        <span style="font-size:0.72rem;color:var(--text-dim);margin-left:10px;">Interaktives Werkzeug zum Erkunden des Strahlengangs</span>
+      </div>` : ''}
+      <div class="hint-box" id="hint-box-1-${task.id}">
+        <div class="hint-title">💡 HINWEIS 1</div>
+        ${task.hints[0]}
+      </div>
+      <div class="hint-box" id="hint-box-2-${task.id}">
+        <div class="hint-title">💡 HINWEIS 2 – Rechenweg</div>
+        ${task.hints[1]}
+      </div>
+
+      <div class="input-area">
+        <div class="answer-input-wrap">
+          <input type="number" step="0.1" class="answer-input" id="answer-input-${task.id}"
+            placeholder="${task.unit === '' ? 'Antwort (0 oder 1)' : 'Winkel eingeben...'}"
+            ${ts.solved ? 'disabled' : ''}
+            onkeydown="if(event.key==='Enter')submitAnswer('${task.id}')"
+          >
+          ${unitSpan}
+        </div>
+        <button class="btn-hint" id="hint1-btn-${task.id}"
+          onclick="showHint('${task.id}', 1)"
+          ${ts.hintsShown >= 1 ? 'disabled' : ''}>
+          Hinweis 1 (-5P)
+        </button>
+        <button class="btn-hint" id="hint2-btn-${task.id}"
+          onclick="showHint('${task.id}', 2)"
+          ${ts.hintsShown < 1 || ts.hintsShown >= 2 ? 'disabled' : ''}>
+          Hinweis 2 (-5P)
+        </button>
+        <button class="btn-submit" onclick="submitAnswer('${task.id}')" ${ts.solved ? 'disabled' : ''}>
+          BESTÄTIGEN
+        </button>
+      </div>
+
+      <div class="attempt-dots" id="attempt-dots-${task.id}">
+        <span style="font-size:0.65rem;color:var(--text-dim);letter-spacing:1px;margin-right:4px;">VERSUCHE</span>
+        <div class="attempt-dot ${ts.attempts >= 1 ? 'used' : ''}" id="dot1-${task.id}"></div>
+        <div class="attempt-dot ${ts.attempts >= 2 ? 'used' : ''}" id="dot2-${task.id}"></div>
+        <div class="attempt-dot ${ts.attempts >= 3 ? 'used' : ''}" id="dot3-${task.id}"></div>
+      </div>
+
+      <div class="feedback-msg ${ts.solved ? 'success show' : ''}" id="feedback-${task.id}">
+        ${ts.solved ? task.successMsg : ''}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('task-area').innerHTML = html;
+
+  // Restore hint visibility
+  if (ts.hintsShown >= 1) document.getElementById(`hint-box-1-${task.id}`).classList.add('show');
+  if (ts.hintsShown >= 2) document.getElementById(`hint-box-2-${task.id}`).classList.add('show');
+
+  // Restore input state
+  if (ts.solved) {
+    const inp = document.getElementById(`answer-input-${task.id}`);
+    if (inp) {
+      inp.value = task.answer;
+      inp.classList.add('correct');
+    }
+  }
+
+  // Focus input
+  setTimeout(() => {
+    const inp = document.getElementById(`answer-input-${task.id}`);
+    if (inp && !ts.solved) inp.focus();
+  }, 200);
+}
+
+// =============================================
+// HINTS
+// =============================================
+function showHint(taskId, num) {
+  const ts = state.taskStates[taskId];
+  if (num === 1 && ts.hintsShown < 1) {
+    ts.hintsShown = 1;
+    document.getElementById(`hint-box-1-${taskId}`).classList.add('show');
+    document.getElementById(`hint1-btn-${taskId}`).disabled = true;
+    document.getElementById(`hint2-btn-${taskId}`).disabled = false;
+    state.score = Math.max(0, state.score - 5);
+    state.hintsUsed++;
+    updateScoreDisplay();
+    showFeedback(taskId, `ℹ Hinweis 1 freigeschaltet. -5 Punkte.`, 'info');
+  } else if (num === 2 && ts.hintsShown === 1) {
+    ts.hintsShown = 2;
+    document.getElementById(`hint-box-2-${taskId}`).classList.add('show');
+    document.getElementById(`hint2-btn-${taskId}`).disabled = true;
+    state.score = Math.max(0, state.score - 5);
+    state.hintsUsed++;
+    updateScoreDisplay();
+    showFeedback(taskId, `ℹ Hinweis 2 freigeschaltet. -5 Punkte.`, 'info');
+  }
+}
+
+// =============================================
+// SUBMIT ANSWER
+// =============================================
+function submitAnswer(taskId) {
+  const task = TASKS.find(t => t.id === taskId);
+  const ts = state.taskStates[taskId];
+  if (ts.solved) return;
+
+  const inp = document.getElementById(`answer-input-${taskId}`);
+  const raw = inp.value.replace(',', '.').trim();
+  const val = parseFloat(raw);
+
+  if (isNaN(val)) {
+    showFeedback(taskId, '⚠ Bitte eine Zahl eingeben!', 'error');
+    return;
+  }
+
+  const correct = Math.abs(val - task.answer) <= task.tolerance;
+
+  if (correct) {
+    // Correct!
+    ts.solved = true;
+    state.solvedCount++;
+    inp.classList.add('correct');
+    inp.disabled = true;
+    document.querySelector(`button[onclick="submitAnswer('${taskId}')"]`).disabled = true;
+    document.getElementById(`hint1-btn-${taskId}`).disabled = true;
+    document.getElementById(`hint2-btn-${taskId}`).disabled = true;
+    state.score += task.points;
+    updateScoreDisplay();
+    showFeedback(taskId, task.successMsg, 'success');
+    updateStepDots();
+
+    // Progress bar
+    const done = Object.values(state.taskStates).filter(t => t.solved).length;
+    const total = TASKS.filter(t => t.mission !== 4).length;
+    document.getElementById('progress-fill').style.width = `${Math.min(100, (done / total) * 100)}%`;
+    document.getElementById('progress-text').textContent = `${Math.min(done, total)} / ${total} Aufgaben`;
+
+    // Check mission complete
+    setTimeout(() => checkMissionComplete(task), 800);
+  } else {
+    ts.attempts++;
+    state.errorsTotal++;
+    state.score = Math.max(0, state.score - 3);
+    updateScoreDisplay();
+    inp.classList.add('wrong');
+    setTimeout(() => inp.classList.remove('wrong'), 500);
+
+    // Update attempt dot
+    const dot = document.getElementById(`dot${ts.attempts}-${taskId}`);
+    if (dot) dot.classList.add('used');
+
+    const errMsg = task.errorMsgs[Math.min(ts.attempts - 1, task.errorMsgs.length - 1)];
+    showFeedback(taskId, errMsg, 'error');
+
+    if (ts.attempts >= 3) {
+      // Auto-show hint 1 after 3 failed attempts
+      if (ts.hintsShown === 0) showHint(taskId, 1);
+    }
+  }
+}
+
+function showFeedback(taskId, msg, type) {
+  const el = document.getElementById(`feedback-${taskId}`);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `feedback-msg ${type} show`;
+}
+
+// =============================================
+// MISSION COMPLETE
+// =============================================
+function checkMissionComplete(task) {
+  const missionTasks = TASKS.filter(t => t.mission === task.mission && t.mission !== 4);
+  const allSolved = missionTasks.every(t => state.taskStates[t.id]?.solved);
+
+  if (!allSolved) {
+    // Next task in same mission
+    const nextIdx = state.currentTaskIndex + 1;
+    if (nextIdx < TASKS.length && TASKS[nextIdx].mission === task.mission) {
+      state.currentTaskIndex = nextIdx;
+      renderTask();
+      updateStepDots();
+    }
+    return;
+  }
+
+  // All tasks in this mission done
+  if (task.mission < 3) {
+    const banner = document.getElementById('mission-complete-banner');
+    const msgs = {
+      1: '⚡ Schutzschild-Sensoren kalibriert! Der Weg ins Innere der AURORA ist frei. Weiter zu Mission 2.',
+      2: '🧪 Kühlmittel identifiziert! Das Leck kann abgedichtet werden. Weiter zu Mission 3.',
+    };
+    document.getElementById('mc-title').textContent = `✓ MISSION ${String(task.mission).padStart(2,'0')} ABGESCHLOSSEN`;
+    document.getElementById('mc-text').textContent = msgs[task.mission];
+    document.getElementById('mc-next-btn').textContent = `NÄCHSTE MISSION ▶`;
+    banner.classList.add('show');
+  } else if (task.mission === 3) {
+    // All mandatory missions done
+    const banner = document.getElementById('mission-complete-banner');
+    document.getElementById('mc-title').textContent = '★ ALLE PFLICHTMISSIONEN ABGESCHLOSSEN!';
+    document.getElementById('mc-text').textContent = '🚀 Die AURORA ist fast gerettet! Eine geheime Bonus-Mission wartet auf dich. Oder zeige dein Ergebnis an.';
+    document.getElementById('mc-next-btn').textContent = '★ BONUS-MISSION STARTEN';
+    banner.classList.add('show');
+    state.bonusUnlocked = true;
+  }
+}
+
+function nextMission() {
+  document.getElementById('mission-complete-banner').classList.remove('show');
+
+  if (state.bonusUnlocked && TASKS[state.currentTaskIndex + 1]?.mission === 4) {
+    state.currentTaskIndex++;
+    document.getElementById('bonus-unlock').classList.add('show');
+    setTimeout(() => document.getElementById('bonus-unlock').classList.remove('show'), 3000);
+    renderTask();
+    updateStepDots();
+    return;
+  }
+
+  // Find next unsolved task
+  for (let i = 0; i < TASKS.length; i++) {
+    const t = TASKS[i];
+    if (!state.taskStates[t.id]?.solved && t.mission !== 4) {
+      state.currentTaskIndex = i;
+      renderTask();
+      updateStepDots();
+      return;
+    }
+  }
+
+  // If bonus unlocked
+  if (state.bonusUnlocked) {
+    const bonusTask = TASKS.find(t => t.mission === 4);
+    if (bonusTask && !state.taskStates[bonusTask.id]?.solved) {
+      state.currentTaskIndex = TASKS.indexOf(bonusTask);
+      renderTask();
+      updateStepDots();
+      return;
+    }
+  }
+
+  endGame(false);
+}
+
+// =============================================
+// STEP DOTS
+// =============================================
+function updateStepDots() {
+  const container = document.getElementById('step-dots');
+  container.innerHTML = '';
+
+  const mainTasks = TASKS.filter(t => t.mission !== 4);
+  const bonusTask = TASKS.find(t => t.mission === 4);
+
+  mainTasks.forEach((t, i) => {
+    const ts = state.taskStates[t.id];
+    const isActive = state.currentTaskIndex === TASKS.indexOf(t);
+    let cls = 'step-dot';
+    if (ts?.solved) cls += ' done';
+    else if (isActive) cls += ' active';
+    const dot = document.createElement('div');
+    dot.className = cls;
+    dot.textContent = i + 1;
+    container.appendChild(dot);
+  });
+
+  if (bonusTask) {
+    const ts = state.taskStates[bonusTask.id];
+    const isActive = state.currentTaskIndex === TASKS.indexOf(bonusTask);
+    let cls = 'step-dot bonus';
+    if (ts?.solved) cls += ' done';
+    else if (isActive) cls += ' active';
+    const dot = document.createElement('div');
+    dot.className = cls;
+    dot.textContent = '★';
+    container.appendChild(dot);
+  }
+}
+
+// =============================================
+// SCORE DISPLAY
+// =============================================
+function updateScoreDisplay() {
+  document.getElementById('score-val').textContent = state.score;
+}
+
+// =============================================
+// END GAME
+// =============================================
+function endGame(timeout) {
+  if (state.gameEnded) return;
+  state.gameEnded = true;
+  clearInterval(state.timerInterval);
+  state.timerRunning = false;
+
+  document.getElementById('timeup-modal').classList.remove('show');
+
+  const solved = Object.values(state.taskStates).filter(t => t.solved).length;
+  const total = TASKS.filter(t => t.mission !== 4).length;
+
+  document.getElementById('final-score').textContent = state.score;
+  document.getElementById('end-solved').textContent = `${solved} / ${total}`;
+  document.getElementById('end-hints').textContent = state.hintsUsed;
+  document.getElementById('end-errors').textContent = state.errorsTotal;
+
+  const m = Math.floor(state.timerSeconds / 60);
+  const s = state.timerSeconds % 60;
+  document.getElementById('end-time').textContent = timeout ? '00:00' : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+  // Determine result
+  let icon, title, subtitle, msg;
+  const pct = state.score / 100;
+
+  const bonusSolved = state.taskStates['T4_1']?.solved;
+
+  if (bonusSolved) {
+    icon = '🏆'; title = 'STATION AURORA GERETTET!'; subtitle = 'BONUS-MISSION ABGESCHLOSSEN';
+    msg = 'Außergewöhnliche Leistung! Du hast nicht nur alle Pflichtmissionen abgeschlossen, sondern auch den Lichtleiter vollständig repariert. Die AURORA kann wieder fliegen – und das galaktische Datennetz ist sicher. 🚀';
+  } else if (solved === total) {
+    icon = '🛸'; title = 'MISSION ERFOLGREICH!'; subtitle = 'ALLE SYSTEME KALIBRIERT';
+    msg = 'Gut gemacht! Alle Pflichtmissionen abgeschlossen. Die Raumstation AURORA ist wieder einsatzbereit. Deine Kenntnisse in Brechungsgesetz und Totalreflexion haben die Besatzung gerettet!';
+  } else if (solved >= 4) {
+    icon = '🌟'; title = 'GUTE LEISTUNG'; subtitle = 'STATION TEILWEISE KALIBRIERT';
+    msg = 'Fast geschafft! Die wichtigsten Systeme sind wieder online. Einige Module brauchen noch Nacharbeit – überprüfe die noch nicht gelösten Aufgaben noch einmal.';
+  } else if (solved >= 2) {
+    icon = '⚠️'; title = 'TEILWEISE ERFOLGREICH'; subtitle = 'SYSTEME INSTABIL';
+    msg = 'Die AURORA treibt noch im Nebel. Einige Systeme konnten kalibriert werden, aber für die vollständige Rettung fehlen noch Berechnungen. Wiederhole Brechungsgesetz und Totalreflexion!';
+  } else {
+    icon = '🔴'; title = 'MISSION FEHLGESCHLAGEN'; subtitle = 'RÜCKKEHR ZUR BASIS';
+    msg = 'Die Systeme konnten nicht rechtzeitig kalibriert werden. Aber keine Sorge – Übung macht den Meister! Wiederhole die Formeln für Brechungsgesetz und Totalreflexion und starte neu.';
+  }
+
+  document.getElementById('end-icon').textContent = icon;
+  document.getElementById('end-title').textContent = title;
+  document.getElementById('end-subtitle').textContent = subtitle;
+  document.getElementById('end-message').textContent = msg;
+
+  showScreen('end');
+}
+
+function showTimeUpModal() {
+  document.getElementById('timeup-modal').classList.add('show');
+}
+
+// =============================================
+// TEACHER MODE
+// =============================================
+function openTeacherModal() {
+  document.getElementById('teacher-pw-input').value = '';
+  document.getElementById('pw-error').classList.remove('show');
+  document.getElementById('teacher-modal').classList.add('show');
+  setTimeout(() => document.getElementById('teacher-pw-input').focus(), 200);
+}
+
+function closeTeacherModal() {
+  document.getElementById('teacher-modal').classList.remove('show');
+}
+
+function checkTeacherPw() {
+  const pw = document.getElementById('teacher-pw-input').value;
+  if (pw === 'Aurora2025') {
+    closeTeacherModal();
+    showScreen('teacher');
+  } else {
+    document.getElementById('pw-error').classList.add('show');
+    document.getElementById('teacher-pw-input').value = '';
+    document.getElementById('teacher-pw-input').focus();
+  }
+}
+
+function exitTeacherMode() {
+  if (state.screen === 'teacher') {
+    const prev = state.score >= 0 ? 'game' : 'intro';
+    showScreen(state.solvedCount > 0 ? 'game' : 'intro');
+    if (state.solvedCount > 0) { renderTask(); updateStepDots(); }
+  }
+}
+
+// =============================================
+// PRISM VISUALIZER
+// =============================================
+function openPrismModal() {
+  document.getElementById('prism-modal').classList.add('show');
+  updatePrism();
+}
+
+function closePrismModal() {
+  document.getElementById('prism-modal').classList.remove('show');
+}
+
+document.getElementById('prism-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePrismModal();
+});
+
+function updatePrism() {
+  const alpha1 = parseInt(document.getElementById('pslider-alpha').value);
+  const gamma  = parseInt(document.getElementById('pslider-gamma').value);
+  const nVal   = parseInt(document.getElementById('pslider-n').value) / 100;
+
+  document.getElementById('pval-alpha').textContent = alpha1 + '°';
+  document.getElementById('pval-gamma').textContent = gamma + '°';
+  document.getElementById('pval-n').textContent = nVal.toFixed(2);
+
+  drawPrism(alpha1, gamma, nVal);
+}
+
+function drawPrism(alpha1Deg, gammaDeg, n) {
+  const canvas = document.getElementById('prism-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background grid
+  ctx.strokeStyle = 'rgba(0,229,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+
+  // Prisma geometry: equilateral-like triangle
+  // Bottom-left, bottom-right, apex
+  const cx = W / 2, cy = H * 0.82;
+  const baseHalf = W * 0.32;
+  const apex = { x: cx, y: H * 0.08 };
+  const bl   = { x: cx - baseHalf, y: cy };
+  const br   = { x: cx + baseHalf, y: cy };
+
+  // Draw prism
+  ctx.beginPath();
+  ctx.moveTo(apex.x, apex.y);
+  ctx.lineTo(bl.x, bl.y);
+  ctx.lineTo(br.x, br.y);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,100,200,0.08)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,229,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Left face normal vector angle (inward normal of left face)
+  // Left face: apex -> bl
+  const leftFaceDx = bl.x - apex.x;
+  const leftFaceDy = bl.y - apex.y;
+  const leftFaceAngle = Math.atan2(leftFaceDy, leftFaceDx); // angle of face
+  const leftNormalAngle = leftFaceAngle - Math.PI / 2; // inward normal (rotated 90° CCW)
+
+  // Entry point on left face (midpoint area)
+  const entryT = 0.45;
+  const entryPt = {
+    x: apex.x + entryT * leftFaceDx,
+    y: apex.y + entryT * leftFaceDy
+  };
+
+  // Draw normal at entry
+  const normLen = 45;
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(entryPt.x - Math.cos(leftNormalAngle) * normLen, entryPt.y - Math.sin(leftNormalAngle) * normLen);
+  ctx.lineTo(entryPt.x + Math.cos(leftNormalAngle) * normLen, entryPt.y + Math.sin(leftNormalAngle) * normLen);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Incoming ray: from outside, angle alpha1 relative to normal
+  // Normal points inward; incoming ray comes from upper left
+  const incomingAngle = leftNormalAngle + Math.PI + toRad(alpha1Deg);
+  const incomingLen = 110;
+  const incomingStart = {
+    x: entryPt.x - Math.cos(incomingAngle) * incomingLen,
+    y: entryPt.y - Math.sin(incomingAngle) * incomingLen
+  };
+
+  // Snellius at entry: n1*sin(a1) = n2*sin(b1)
+  const sinB1 = Math.sin(toRad(alpha1Deg)) / n;
+  const totalRefAtEntry = sinB1 > 1;
+  let b1Deg = 0, b1Rad = 0;
+
+  if (!totalRefAtEntry) {
+    b1Rad = Math.asin(sinB1);
+    b1Deg = toDeg(b1Rad);
+  }
+
+  // Refracted ray inside prism: angle b1 from normal (inward direction)
+  const refractedAngle = leftNormalAngle + toRad(b1Deg);
+
+  // Right face: apex -> br
+  const rightFaceDx = br.x - apex.x;
+  const rightFaceDy = br.y - apex.y;
+  const rightFaceAngle = Math.atan2(rightFaceDy, rightFaceDx);
+  const rightNormalAngle = rightFaceAngle + Math.PI / 2; // inward normal of right face
+
+  // Find intersection of refracted ray with right face (parametric)
+  function lineIntersect(p1, d1, p2, d2) {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const denom = d1.x * d2.y - d1.y * d2.x;
+    if (Math.abs(denom) < 1e-10) return null;
+    const t = (dx * d2.y - dy * d2.x) / denom;
+    return { x: p1.x + t * d1.x, y: p1.y + t * d1.y, t };
+  }
+
+  const refDir = { x: Math.cos(refractedAngle), y: Math.sin(refractedAngle) };
+  const rfDir  = { x: rightFaceDx, y: rightFaceDy };
+  const exitPt = lineIntersect(entryPt, refDir, apex, rfDir);
+
+  // Angle of refracted ray relative to right face normal
+  // Angle between refracted ray direction and inward normal of right face
+  const dotProd = refDir.x * Math.cos(rightNormalAngle) + refDir.y * Math.sin(rightNormalAngle);
+  const b2Rad = Math.acos(Math.max(-1, Math.min(1, Math.abs(dotProd))));
+  const b2Deg = toDeg(b2Rad);
+  // Actually use: angle of incidence at right face = angle between ray and OUTWARD normal
+  // Simpler: b2 = gamma - b1
+  const b2DegCalc = gammaDeg - b1Deg;
+
+  // Grenzwinkel for glass->air
+  const sinGrenz = 1 / n;
+  const grenzDeg = toDeg(Math.asin(sinGrenz));
+  const isTotalRef = b2DegCalc >= grenzDeg;
+
+  // Draw incoming ray
+  ctx.beginPath();
+  ctx.moveTo(incomingStart.x, incomingStart.y);
+  ctx.lineTo(entryPt.x, entryPt.y);
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Arrow on incoming ray
+  drawArrow(ctx, incomingStart.x, incomingStart.y, entryPt.x, entryPt.y, '#00e5ff');
+
+  if (!totalRefAtEntry && exitPt && exitPt.t > 0.01) {
+    // Draw refracted ray inside prism
+    ctx.beginPath();
+    ctx.moveTo(entryPt.x, entryPt.y);
+    ctx.lineTo(exitPt.x, exitPt.y);
+    ctx.strokeStyle = '#7af0ff';
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = '#7af0ff';
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    drawArrow(ctx, entryPt.x, entryPt.y, exitPt.x, exitPt.y, '#7af0ff');
+
+    // Normal at exit point
+    ctx.setLineDash([4,4]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(exitPt.x - Math.cos(rightNormalAngle)*normLen, exitPt.y - Math.sin(rightNormalAngle)*normLen);
+    ctx.lineTo(exitPt.x + Math.cos(rightNormalAngle)*normLen, exitPt.y + Math.sin(rightNormalAngle)*normLen);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (isTotalRef) {
+      // Total internal reflection at right face
+      // Reflected ray: mirror about right face normal
+      const reflAngle = rightNormalAngle * 2 - refractedAngle + Math.PI;
+      const reflDir = { x: Math.cos(reflAngle), y: Math.sin(reflAngle) };
+      // Find where reflected ray exits (bottom face apex->br line intersection)
+      // Bottom face: bl -> br
+      const bottomDir = { x: br.x - bl.x, y: br.y - bl.y };
+      const bottomExit = lineIntersect(exitPt, reflDir, bl, bottomDir);
+
+      ctx.beginPath();
+      ctx.moveTo(exitPt.x, exitPt.y);
+      if (bottomExit && bottomExit.t > 0) {
+        ctx.lineTo(bottomExit.x, bottomExit.y);
+        ctx.strokeStyle = '#ff3d5a';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#ff3d5a';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        drawArrow(ctx, exitPt.x, exitPt.y, bottomExit.x, bottomExit.y, '#ff3d5a');
+        // Exit through bottom
+        const exitDir2 = { x: Math.cos(reflAngle), y: Math.sin(reflAngle) };
+        const exitEnd = { x: bottomExit.x + exitDir2.x * 80, y: bottomExit.y + exitDir2.y * 80 };
+        ctx.beginPath();
+        ctx.moveTo(bottomExit.x, bottomExit.y);
+        ctx.lineTo(exitEnd.x, exitEnd.y);
+        ctx.strokeStyle = '#ff8c00';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#ff8c00';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        drawArrow(ctx, bottomExit.x, bottomExit.y, exitEnd.x, exitEnd.y, '#ff8c00');
+      } else {
+        ctx.lineTo(exitPt.x + reflDir.x * 100, exitPt.y + reflDir.y * 100);
+        ctx.strokeStyle = '#ff3d5a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Label: TOTALREFLEXION
+      ctx.font = 'bold 11px Orbitron, monospace';
+      ctx.fillStyle = '#ff3d5a';
+      ctx.textAlign = 'center';
+      ctx.fillText('TOTALREFLEXION', exitPt.x + 30, exitPt.y - 14);
+
+    } else {
+      // Normal exit: Snellius at right face
+      const sinAlpha2 = n * Math.sin(toRad(b2DegCalc));
+      if (Math.abs(sinAlpha2) <= 1) {
+        const alpha2Rad = Math.asin(Math.max(-1, Math.min(1, sinAlpha2)));
+        // Exit ray direction: rotated from right face outward normal
+        const exitAngle = rightNormalAngle + Math.PI - alpha2Rad;
+        const exitEnd = {
+          x: exitPt.x + Math.cos(exitAngle) * 110,
+          y: exitPt.y + Math.sin(exitAngle) * 110
+        };
+        ctx.beginPath();
+        ctx.moveTo(exitPt.x, exitPt.y);
+        ctx.lineTo(exitEnd.x, exitEnd.y);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        drawArrow(ctx, exitPt.x, exitPt.y, exitEnd.x, exitEnd.y, '#00ff88');
+      }
+    }
+  }
+
+  // Labels
+  ctx.font = '11px "Exo 2", sans-serif';
+  ctx.fillStyle = 'rgba(200,230,255,0.5)';
+  ctx.textAlign = 'center';
+  ctx.fillText('n = ' + n.toFixed(2), cx, cy + 18);
+
+  // Angle labels
+  ctx.font = '10px "Orbitron", monospace';
+  ctx.fillStyle = 'rgba(0,229,255,0.8)';
+  ctx.textAlign = 'left';
+  ctx.fillText('α₁=' + alpha1Deg + '°', incomingStart.x + 4, incomingStart.y - 6);
+  if (!totalRefAtEntry) {
+    ctx.fillStyle = 'rgba(0,255,136,0.8)';
+    ctx.fillText('β₁≈' + b1Deg.toFixed(1) + '°', entryPt.x + 8, entryPt.y + 16);
+    if (exitPt) {
+      ctx.fillStyle = isTotalRef ? 'rgba(255,61,90,0.9)' : 'rgba(0,200,120,0.8)';
+      ctx.fillText('β₂≈' + b2DegCalc.toFixed(1) + '°', exitPt.x + 8, exitPt.y - 8);
+    }
+  }
+
+  // Gamma angle at apex
+  ctx.font = '10px "Orbitron", monospace';
+  ctx.fillStyle = 'rgba(255,215,0,0.7)';
+  ctx.textAlign = 'center';
+  ctx.fillText('γ=' + gammaDeg + '°', apex.x, apex.y + 20);
+
+  // Info chips
+  const infoRow = document.getElementById('prism-info-row');
+  const grenzStr = grenzDeg.toFixed(1);
+  const b2Str = b2DegCalc.toFixed(1);
+  infoRow.innerHTML = `
+    <div class="prism-info-chip">β₁ (Eintritt): <span>${b1Deg.toFixed(1)}°</span></div>
+    <div class="prism-info-chip">β₂ (Austritt innen): <span>${b2Str}°</span></div>
+    <div class="prism-info-chip ${isTotalRef ? 'total-ref' : ''}">
+      Grenzwinkel: <span>${grenzStr}°</span>
+    </div>
+    <div class="prism-info-chip ${isTotalRef ? 'total-ref' : ''}">
+      Status: <span>${isTotalRef ? '🔴 TOTALREFLEXION' : '🟢 Austritt'}</span>
+    </div>
+  `;
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const len = 9;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(angle - 0.4), y2 - len * Math.sin(angle - 0.4));
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(angle + 0.4), y2 - len * Math.sin(angle + 0.4));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+}
+
+// Close modal on overlay click
+document.getElementById('teacher-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeTeacherModal();
+});
+</script>
+</body>
+</html>
